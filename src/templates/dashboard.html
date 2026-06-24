@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-gray-800', 'text-white', 'border-l-4', 'border-blue-500');
+                btn.classList.add('text-gray-400', 'hover:bg-gray-800', 'hover:text-white');
+            });
+            
+            document.getElementById(tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.remove('text-gray-400', 'hover:bg-gray-800', 'hover:text-white');
+            activeBtn.classList.add('bg-gray-800', 'text-white', 'border-l-4', 'border-blue-500');
+        }
+
+        function searchTable(inputId, tableId) {
+            let input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById(inputId);
+            filter = input.value.toUpperCase();
+            table = document.getElementById(tableId);
+            tr = table.getElementsByTagName("tr");
+
+            for (i = 1; i < tr.length; i++) {
+                let rowText = tr[i].innerText || tr[i].textContent;
+                if (rowText.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }
+        }
+
+        async function fetchCRMReport(qualificationId) {
+            // Show modal and loading state
+            document.getElementById('crm-modal').classList.remove('hidden');
+            document.getElementById('crm-content').classList.add('hidden');
+            document.getElementById('crm-loading').classList.remove('hidden');
+            
+            // Set override form action
+            document.getElementById('override-form').action = `/dashboard/api/override/${qualificationId}`;
+            document.getElementById('rerun-form').action = `/dashboard/api/pipeline/rerun/${qualificationId}`;
+            
+            try {
+                const response = await fetch(`/dashboard/api/crm_report/${qualificationId}`);
+                if (!response.ok) throw new Error('Failed to fetch CRM Report');
+                const data = await response.json();
+                
+                // Populate Header
+                document.getElementById('crm-project-name').innerText = data.project_name;
+                
+                const statusBadge = document.getElementById('crm-status-badge');
+                statusBadge.innerText = data.final_decision;
+                statusBadge.className = "px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wider ";
+                if(data.final_decision === "Approved") statusBadge.classList.add("bg-green-100", "text-green-800");
+                else if(data.final_decision === "Rejected") statusBadge.classList.add("bg-red-100", "text-red-800");
+                else statusBadge.classList.add("bg-yellow-100", "text-yellow-800");
+                
+                // Summary
+                document.getElementById('crm-reasoning').innerText = data.decision_reasoning;
+                
+                // Complexity
+                const comp = data.complexity_report;
+                document.getElementById('crm-duration').innerText = `${comp.estimated_duration_months} Months`;
+                document.getElementById('crm-tech').innerHTML = comp.recommended_technologies.map(t => `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">${t}</span>`).join(' ');
+                document.getElementById('crm-roles').innerHTML = comp.required_roles.map(r => `<li class="text-sm text-gray-700 mb-1"><i class="fa-solid fa-user text-gray-400 mr-2"></i>${r}</li>`).join('');
+                
+                // Feasibility
+                const feas = data.feasibility_report;
+                document.getElementById('crm-feas-score').innerText = `${feas.feasibility_score}/100`;
+                document.getElementById('crm-hist').innerText = feas.historical_project_match;
+                document.getElementById('crm-missing-tech').innerHTML = feas.missing_technologies.length > 0 ? feas.missing_technologies.map(t => `<li class="text-sm text-red-600 mb-1"><i class="fa-solid fa-circle-xmark mr-2"></i>${t}</li>`).join('') : '<li class="text-sm text-green-600"><i class="fa-solid fa-check mr-2"></i>None</li>';
+                document.getElementById('crm-missing-roles').innerHTML = feas.missing_roles.length > 0 ? feas.missing_roles.map(r => `<li class="text-sm text-red-600 mb-1"><i class="fa-solid fa-circle-xmark mr-2"></i>${r}</li>`).join('') : '<li class="text-sm text-green-600"><i class="fa-solid fa-check mr-2"></i>None</li>';
+                
+                // We map missing_infrastructure from crm report data root.
+                const missingInfra = data.missing_infrastructure || [];
+                document.getElementById('crm-missing-infra').innerHTML = missingInfra.length > 0 ? missingInfra.map(i => `<li class="text-sm text-red-600 mb-1"><i class="fa-solid fa-circle-xmark mr-2"></i>${i}</li>`).join('') : '<li class="text-sm text-green-600"><i class="fa-solid fa-check mr-2"></i>None</li>';
+                
+                document.getElementById('crm-partial-roles').innerHTML = feas.partially_available_roles.length > 0 ? feas.partially_available_roles.map(r => `<li class="text-sm text-yellow-600 mb-1"><i class="fa-solid fa-triangle-exclamation mr-2"></i>${r}</li>`).join('') : '<li class="text-sm text-green-600"><i class="fa-solid fa-check mr-2"></i>None</li>';
+                
+                // Risk
+                const risk = data.risk_analysis;
+                document.getElementById('crm-risk-score').innerText = `${risk.risk_score}/100`;
+                document.getElementById('crm-risk-reason').innerText = risk.risk_reasoning;
+                document.getElementById('crm-reg').innerText = feas.regulatory_and_legal_constraints;
+                document.getElementById('crm-vendor').innerText = feas.third_party_vendor_risks;
+                
+                // Hide loading, show content
+                document.getElementById('crm-loading').classList.add('hidden');
+                document.getElementById('crm-content').classList.remove('hidden');
+            } catch (error) {
+                alert(error.message);
+                closeCRMModal();
+            }
+        }
+        
+        function closeCRMModal() {
+            document.getElementById('crm-modal').classList.add('hidden');
+        }
+
+        function openEditEmployeeModal(id, name, email, designation) {
+            document.getElementById('edit-emp-name').value = name;
+            document.getElementById('edit-emp-email').value = email;
+            document.getElementById('edit-emp-designation').value = designation;
+            document.getElementById('edit-employee-form').action = `/dashboard/api/employees/edit/${id}`;
+            document.getElementById('edit-employee-modal').classList.remove('hidden');
+        }
+
+        function openEditTechModal(id, name, category, version) {
+            document.getElementById('edit-tech-name').value = name;
+            document.getElementById('edit-tech-category').value = category;
+            document.getElementById('edit-tech-version').value = version;
+            document.getElementById('edit-tech-form').action = `/dashboard/api/technologies/edit/${id}`;
+            document.getElementById('edit-tech-modal').classList.remove('hidden');
+        }
+
+        function openEditInfraModal(id, name, category, type, quantity) {
+            document.getElementById('edit-infra-name').value = name;
+            document.getElementById('edit-infra-category').value = category;
+            document.getElementById('edit-infra-type').value = type;
+            document.getElementById('edit-infra-quantity').value = quantity;
+            document.getElementById('edit-infra-form').action = `/dashboard/api/infrastructure/edit/${id}`;
+            document.getElementById('edit-infra-modal').classList.remove('hidden');
+        }
+    </script>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <!-- Sidebar -->
+    <div class="flex h-screen overflow-hidden">
+        <div class="w-64 bg-gray-900 text-white flex flex-col">
+            <div class="h-16 flex items-center px-6 border-b border-gray-800 font-bold text-xl tracking-wider">
+                <i class="fa-solid fa-chart-line text-blue-500 mr-3"></i> Admin Panel
+            </div>
+            
+            <nav class="flex-1 py-4">
+                <button id="btn-tab-overview" onclick="showTab('tab-overview')" class="tab-btn w-full flex items-center px-6 py-3 bg-gray-800 text-white border-l-4 border-blue-500 transition-colors focus:outline-none text-left">
+                    <i class="fa-solid fa-house w-6 text-center mr-2"></i> Overview
+                </button>
+                <button id="btn-tab-notifications" onclick="showTab('tab-notifications')" class="tab-btn w-full flex items-center px-6 py-3 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors focus:outline-none text-left">
+                    <i class="fa-solid fa-bell w-6 text-center mr-2"></i> Notifications
+                    {% if qualifications|length > 0 %}
+                    <span class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full">{{ qualifications|length }}</span>
+                    {% endif %}
+                </button>
+                <button id="btn-tab-employees" onclick="showTab('tab-employees')" class="tab-btn w-full flex items-center px-6 py-3 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors focus:outline-none text-left">
+                    <i class="fa-solid fa-users w-6 text-center mr-2"></i> Employees
+                </button>
+                <button id="btn-tab-technologies" onclick="showTab('tab-technologies')" class="tab-btn w-full flex items-center px-6 py-3 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors focus:outline-none text-left">
+                    <i class="fa-solid fa-microchip w-6 text-center mr-2"></i> Technologies
+                </button>
+                <button id="btn-tab-infrastructure" onclick="showTab('tab-infrastructure')" class="tab-btn w-full flex items-center px-6 py-3 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors focus:outline-none text-left">
+                    <i class="fa-solid fa-server w-6 text-center mr-2"></i> Infrastructure
+                </button>
+            </nav>
+            
+            <div class="p-4 border-t border-gray-800">
+                <a href="/dashboard/logout" class="flex items-center text-gray-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-right-from-bracket mr-3"></i> Logout
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100">
+            <header class="bg-white shadow-sm h-16 flex items-center px-8">
+                <h2 class="text-xl font-semibold text-gray-800">Company Knowledge Base</h2>
+            </header>
+
+            <main class="p-8">
+                
+                <!-- Overview Tab -->
+                <div id="tab-overview" class="tab-content">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500">
+                            <h3 class="text-gray-500 text-sm font-semibold uppercase mb-2">Total Employees</h3>
+                            <p class="text-3xl font-bold text-gray-800">{{ stats.employees }}</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-green-500">
+                            <h3 class="text-gray-500 text-sm font-semibold uppercase mb-2">Technologies</h3>
+                            <p class="text-3xl font-bold text-gray-800">{{ stats.technologies }}</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-purple-500">
+                            <h3 class="text-gray-500 text-sm font-semibold uppercase mb-2">Total Skills</h3>
+                            <p class="text-3xl font-bold text-gray-800">{{ stats.skills }}</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-red-500">
+                            <h3 class="text-gray-500 text-sm font-semibold uppercase mb-2">Active Qualifications</h3>
+                            <p class="text-3xl font-bold text-gray-800">{{ stats.active_qualifications }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notifications / Inbox Tab -->
+                <div id="tab-notifications" class="tab-content hidden">
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-800">Project Qualifications Inbox</h3>
+                        </div>
+                        <div class="p-0">
+                            {% if qualifications|length == 0 %}
+                            <div class="p-8 text-center text-gray-500">
+                                <i class="fa-regular fa-folder-open text-4xl mb-4"></i>
+                                <p>No qualified projects yet. Waiting for AI Agents.</p>
+                            </div>
+                            {% else %}
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
+                                        <th class="p-4 border-b font-medium">Project</th>
+                                        <th class="p-4 border-b font-medium">Complexity</th>
+                                        <th class="p-4 border-b font-medium">Decision</th>
+                                        <th class="p-4 border-b font-medium text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for q in qualifications %}
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-4 border-b text-gray-800 font-medium">{{ q.project_name }}</td>
+                                        <td class="p-4 border-b text-gray-600">{{ q.complexity_score or 'Pending' }}</td>
+                                        <td class="p-4 border-b">
+                                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-semibold">{{ q.final_decision or 'Processing' }}</span>
+                                        </td>
+                                        <td class="p-4 border-b text-right">
+                                            <button onclick="fetchCRMReport({{ q.qualification_id }})" class="text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors"><i class="fa-solid fa-file-invoice mr-1"></i> View Report</button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Employees Tab -->
+                <div id="tab-employees" class="tab-content hidden">
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-800">Employee Roster</h3>
+                            <div class="flex gap-4">
+                                <input type="text" id="search-employees" onkeyup="searchTable('search-employees', 'table-employees')" placeholder="Search employees..." class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                                <button onclick="document.getElementById('add-employee-modal').classList.remove('hidden')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"><i class="fa-solid fa-plus mr-2"></i>Add New</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table id="table-employees" class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
+                                        <th class="p-4 border-b font-medium">Name</th>
+                                        <th class="p-4 border-b font-medium">Designation</th>
+                                        <th class="p-4 border-b font-medium">Email</th>
+                                        <th class="p-4 border-b font-medium text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for emp in employees %}
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-4 border-b text-gray-800 font-medium">{{ emp.employee_name }}</td>
+                                        <td class="p-4 border-b text-gray-600">{{ emp.designation }}</td>
+                                        <td class="p-4 border-b text-gray-600">{{ emp.email }}</td>
+                                        <td class="p-4 border-b text-right">
+                                            <button onclick="openEditEmployeeModal({{ emp.employee_id }}, '{{ emp.employee_name|replace('\'', '\\\'') }}', '{{ emp.email|replace('\'', '\\\'') }}', '{{ emp.designation|replace('\'', '\\\'') }}')" class="text-gray-400 hover:text-blue-600 mr-3"><i class="fa-solid fa-pen"></i></button>
+                                            <form action="/dashboard/api/employees/delete/{{ emp.employee_id }}" method="POST" class="inline">
+                                                <button type="submit" class="text-gray-400 hover:text-red-600" onclick="return confirm('Delete this employee?')"><i class="fa-solid fa-trash"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Technologies Tab -->
+                <div id="tab-technologies" class="tab-content hidden">
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-800">Technology Stack</h3>
+                            <div class="flex gap-4">
+                                <input type="text" id="search-tech" onkeyup="searchTable('search-tech', 'table-tech')" placeholder="Search stack..." class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                                <button onclick="document.getElementById('add-tech-modal').classList.remove('hidden')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"><i class="fa-solid fa-plus mr-2"></i>Add New</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table id="table-tech" class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
+                                        <th class="p-4 border-b font-medium">Technology</th>
+                                        <th class="p-4 border-b font-medium">Category</th>
+                                        <th class="p-4 border-b font-medium">Version</th>
+                                        <th class="p-4 border-b font-medium text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tech in technologies %}
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-4 border-b text-gray-800 font-medium">{{ tech.technology_name }}</td>
+                                        <td class="p-4 border-b text-gray-600">{{ tech.technology_category }}</td>
+                                        <td class="p-4 border-b text-gray-600">{{ tech.version }}</td>
+                                        <td class="p-4 border-b text-right">
+                                            <button onclick="openEditTechModal({{ tech.technology_id }}, '{{ tech.technology_name|replace('\'', '\\\'') }}', '{{ tech.technology_category|replace('\'', '\\\'') }}', '{{ tech.version|replace('\'', '\\\'') }}')" class="text-gray-400 hover:text-blue-600 mr-3"><i class="fa-solid fa-pen"></i></button>
+                                            <form action="/dashboard/api/technologies/delete/{{ tech.technology_id }}" method="POST" class="inline">
+                                                <button type="submit" class="text-gray-400 hover:text-red-600" onclick="return confirm('Delete this technology?')"><i class="fa-solid fa-trash"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Infrastructure Tab -->
+                <div id="tab-infrastructure" class="tab-content hidden">
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-800">Company Infrastructure</h3>
+                            <div class="flex gap-4">
+                                <input type="text" id="search-infrastructure" onkeyup="searchTable('search-infrastructure', 'table-infrastructure')" placeholder="Search infrastructure..." class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                                <button onclick="document.getElementById('add-infra-modal').classList.remove('hidden')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"><i class="fa-solid fa-plus mr-2"></i>Add New</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table id="table-infrastructure" class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
+                                        <th class="p-4 border-b font-medium">Resource Name</th>
+                                        <th class="p-4 border-b font-medium">Category</th>
+                                        <th class="p-4 border-b font-medium">Type</th>
+                                        <th class="p-4 border-b font-medium">Quantity</th>
+                                        <th class="p-4 border-b font-medium">Status</th>
+                                        <th class="p-4 border-b font-medium text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for infra in infrastructures %}
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-4 border-b text-gray-800 font-medium">{{ infra.resource_name }}</td>
+                                        <td class="p-4 border-b text-gray-600">{{ infra.infrastructure_category }}</td>
+                                        <td class="p-4 border-b text-gray-600">{{ infra.resource_type }}</td>
+                                        <td class="p-4 border-b text-gray-600">{{ infra.quantity }}</td>
+                                        <td class="p-4 border-b text-gray-600">
+                                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">{{ infra.availability_status }}</span>
+                                        </td>
+                                        <td class="p-4 border-b text-right">
+                                            <button onclick="openEditInfraModal({{ infra.infrastructure_id }}, '{{ infra.resource_name|replace('\'', '\\\'') }}', '{{ infra.infrastructure_category|replace('\'', '\\\'') }}', '{{ infra.resource_type|replace('\'', '\\\'') }}', {{ infra.quantity }})" class="text-gray-400 hover:text-blue-600 mr-3"><i class="fa-solid fa-pen"></i></button>
+                                            <form action="/dashboard/api/infrastructure/delete/{{ infra.infrastructure_id }}" method="POST" class="inline">
+                                                <button type="submit" class="text-gray-400 hover:text-red-600" onclick="return confirm('Delete this infrastructure?')"><i class="fa-solid fa-trash"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- CRM Report Modal -->
+    <div id="crm-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex justify-center items-center p-4 sm:p-8">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-[fadeIn_0.2s_ease-out]">
+            
+            <!-- Modal Header -->
+            <div class="px-8 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <div class="flex items-center gap-4">
+                    <h2 id="crm-project-name" class="text-2xl font-bold text-gray-800 tracking-tight">Loading Project...</h2>
+                    <span id="crm-status-badge" class=""></span>
+                </div>
+                <button onclick="closeCRMModal()" class="text-gray-400 hover:text-red-500 transition-colors">
+                    <i class="fa-solid fa-xmark text-2xl"></i>
+                </button>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="crm-loading" class="flex-1 flex flex-col justify-center items-center text-gray-500">
+                <i class="fa-solid fa-circle-notch fa-spin text-5xl mb-4 text-blue-500"></i>
+                <p class="font-medium text-lg tracking-wide">Assembling AI Report...</p>
+            </div>
+
+            <!-- Modal Content (Scrollable) -->
+            <div id="crm-content" class="flex-1 overflow-y-auto p-8 bg-gray-50 hidden">
+                
+                <!-- Executive Summary -->
+                <div class="mb-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-3"><i class="fa-solid fa-robot mr-2"></i>AI Executive Summary</h3>
+                    <p id="crm-reasoning" class="text-gray-800 text-lg leading-relaxed"></p>
+                </div>
+
+                <!-- Three Pillar Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Complexity Pillar -->
+                    <div class="bg-white p-6 rounded-lg shadow-sm border-t-4 border-blue-500 flex flex-col h-full">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-layer-group text-blue-500 mr-2"></i>Complexity Analysis</h3>
+                        <div class="mb-4">
+                            <p class="text-gray-500 text-xs font-bold uppercase">Estimated Duration</p>
+                            <p id="crm-duration" class="text-xl font-bold text-gray-800"></p>
+                        </div>
+                        <div class="mb-4">
+                            <p class="text-gray-500 text-xs font-bold uppercase mb-2">Recommended Tech Stack</p>
+                            <div id="crm-tech" class="flex flex-wrap gap-2"></div>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-gray-500 text-xs font-bold uppercase mb-2">Required Roles</p>
+                            <ul id="crm-roles" class="space-y-1"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Feasibility Pillar -->
+                    <div class="bg-white p-6 rounded-lg shadow-sm border-t-4 border-purple-500 flex flex-col h-full">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-building text-purple-500 mr-2"></i>Corporate Feasibility</h3>
+                        <div class="mb-4 flex items-end gap-2">
+                            <div>
+                                <p class="text-gray-500 text-xs font-bold uppercase">Feasibility Score</p>
+                                <p id="crm-feas-score" class="text-2xl font-black text-gray-800"></p>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <p class="text-gray-500 text-xs font-bold uppercase mb-1">Historical Experience</p>
+                            <p id="crm-hist" class="text-sm text-gray-700 bg-gray-50 p-2 rounded"></p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-gray-500 text-xs font-bold uppercase mb-2 text-red-500">Missing Tech</p>
+                                <ul id="crm-missing-tech" class="space-y-1"></ul>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 text-xs font-bold uppercase mb-2 text-red-500">Missing Roles</p>
+                                <ul id="crm-missing-roles" class="space-y-1"></ul>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <p class="text-gray-500 text-xs font-bold uppercase mb-2 text-red-500">Missing Infrastructure</p>
+                            <ul id="crm-missing-infra" class="space-y-1"></ul>
+                        </div>
+                        <div class="mt-4 flex-1">
+                            <p class="text-gray-500 text-xs font-bold uppercase mb-2 text-yellow-600">Partially Available Roles</p>
+                            <ul id="crm-partial-roles" class="space-y-1"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Risk Pillar -->
+                    <div class="bg-white p-6 rounded-lg shadow-sm border-t-4 border-red-500 flex flex-col h-full">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-triangle-exclamation text-red-500 mr-2"></i>Risk Assessment</h3>
+                        <div class="mb-4">
+                            <p class="text-gray-500 text-xs font-bold uppercase">Risk Score</p>
+                            <p id="crm-risk-score" class="text-2xl font-black text-red-600"></p>
+                        </div>
+                        <div class="mb-4">
+                            <p class="text-gray-500 text-xs font-bold uppercase mb-1">Risk Profile</p>
+                            <p id="crm-risk-reason" class="text-sm text-gray-700 bg-red-50 p-2 rounded border border-red-100"></p>
+                        </div>
+                        <div class="mb-4">
+                            <p class="text-gray-500 text-xs font-bold uppercase mb-1">Regulatory Constraints</p>
+                            <p id="crm-reg" class="text-sm text-gray-700"></p>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-gray-500 text-xs font-bold uppercase mb-1">Vendor Risks</p>
+                            <p id="crm-vendor" class="text-sm text-gray-700"></p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Modal Footer (Manual Overrides) -->
+            <div class="p-6 border-t border-gray-200 bg-white flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center gap-4">
+                    <p class="text-sm text-gray-500 hidden md:block"><i class="fa-solid fa-lock text-gray-400 mr-1"></i> Manager Actions</p>
+                    <form id="rerun-form" method="POST">
+                        <button type="submit" onclick="alert('Re-evaluating pipeline. Please check back in 1-2 minutes to see the updated scores and missing lists.')" class="px-4 py-2 bg-purple-100 text-purple-700 font-bold rounded-lg hover:bg-purple-200 transition-colors text-sm border border-purple-200">
+                            <i class="fa-solid fa-rotate mr-2"></i> Re-evaluate Project
+                        </button>
+                    </form>
+                </div>
+                <form id="override-form" method="POST" class="flex gap-3">
+                    <button type="submit" name="decision" value="Rejected" class="px-6 py-2 bg-white border-2 border-red-500 text-red-600 font-bold rounded-lg hover:bg-red-50 transition-colors">
+                        <i class="fa-solid fa-thumbs-down mr-2"></i> Force Reject
+                    </button>
+                    <button type="submit" name="decision" value="Approved" class="px-6 py-2 bg-green-600 text-white font-bold rounded-lg shadow-md hover:bg-green-700 hover:shadow-lg transition-all">
+                        <i class="fa-solid fa-thumbs-up mr-2"></i> Approve Project
+                    </button>
+                </form>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- Add Employee Modal -->
+    <div id="add-employee-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex justify-center items-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md animate-[fadeIn_0.2s_ease-out]">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800">Add New Employee</h2>
+                <button onclick="document.getElementById('add-employee-modal').classList.add('hidden')" class="text-gray-400 hover:text-red-500">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <form action="/dashboard/api/employees/add" method="POST" class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input type="text" name="name" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" name="email" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Designation / Role</label>
+                    <input type="text" name="designation" placeholder="e.g., AI/ML Engineer" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Primary Skills (Comma Separated)</label>
+                    <input type="text" name="skill_name" placeholder="e.g., Python, Machine Learning, AWS" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors">Add Employee</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Technology Modal -->
+    <div id="add-tech-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex justify-center items-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md animate-[fadeIn_0.2s_ease-out]">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800">Add New Technology</h2>
+                <button onclick="document.getElementById('add-tech-modal').classList.add('hidden')" class="text-gray-400 hover:text-red-500">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <form action="/dashboard/api/technologies/add" method="POST" class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Technology Name</label>
+                    <input type="text" name="name" placeholder="e.g., Kubernetes" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <input type="text" name="category" placeholder="e.g., Container Orchestration" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Version</label>
+                    <input type="text" name="version" placeholder="e.g., 1.25" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors">Add Technology</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Employee Modal -->
+    <div id="edit-employee-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex justify-center items-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md animate-[fadeIn_0.2s_ease-out]">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800">Edit Employee</h2>
+                <button onclick="document.getElementById('edit-employee-modal').classList.add('hidden')" class="text-gray-400 hover:text-red-500">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <form id="edit-employee-form" method="POST" class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input type="text" id="edit-emp-name" name="name" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="edit-emp-email" name="email" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Designation / Role</label>
+                    <input type="text" id="edit-emp-designation" name="designation" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Technology Modal -->
+    <div id="edit-tech-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex justify-center items-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md animate-[fadeIn_0.2s_ease-out]">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800">Edit Technology</h2>
+                <button onclick="document.getElementById('edit-tech-modal').classList.add('hidden')" class="text-gray-400 hover:text-red-500">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <form id="edit-tech-form" method="POST" class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Technology Name</label>
+                    <input type="text" id="edit-tech-name" name="name" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <input type="text" id="edit-tech-category" name="category" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Version</label>
+                    <input type="text" id="edit-tech-version" name="version" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Infrastructure Modal -->
+    <div id="edit-infra-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex justify-center items-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md animate-[fadeIn_0.2s_ease-out]">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800">Edit Infrastructure</h2>
+                <button onclick="document.getElementById('edit-infra-modal').classList.add('hidden')" class="text-gray-400 hover:text-red-500">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <form id="edit-infra-form" method="POST" class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Resource Name</label>
+                    <input type="text" id="edit-infra-name" name="name" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select id="edit-infra-category" name="category" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        <option value="IT & Corporate Infrastructure">IT & Corporate Infrastructure</option>
+                        <option value="Cloud Infrastructure">Cloud Infrastructure</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <input type="text" id="edit-infra-type" name="type" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                    <input type="number" id="edit-infra-quantity" name="quantity" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Infrastructure Modal -->
+    <div id="add-infra-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex justify-center items-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md animate-[fadeIn_0.2s_ease-out]">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800">Add Infrastructure</h2>
+                <button onclick="document.getElementById('add-infra-modal').classList.add('hidden')" class="text-gray-400 hover:text-red-500">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <form action="/dashboard/api/infrastructure/add" method="POST" class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Resource Name</label>
+                    <input type="text" name="name" placeholder="e.g., AWS EC2 Instances" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select name="category" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        <option value="IT & Corporate Infrastructure">IT & Corporate Infrastructure</option>
+                        <option value="Cloud Infrastructure">Cloud Infrastructure</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <input type="text" name="type" placeholder="e.g., Compute, Hardware, Network" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                    <input type="number" name="quantity" placeholder="e.g., 10" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors">Add Infrastructure</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

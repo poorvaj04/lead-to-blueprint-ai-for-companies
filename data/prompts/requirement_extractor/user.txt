@@ -1,0 +1,21 @@
+Active Modules and Targets:
+
+{active_modules}
+
+--------------------------------------------------
+
+Allowed Categories
+
+{allowed_categories}
+
+--------------------------------------------------
+
+Latest Client Response
+
+{client_answer}
+
+--------------------------------------------------
+
+Extract structured facts and categorize them under the correct module's 'topic' field.
+
+Return only valid JSON.

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Portal Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 border-b border-gray-200">
+        <div class="flex items-center">
+            <i class="fa-solid fa-robot text-blue-600 text-2xl mr-3"></i>
+            <h1 class="text-xl font-bold text-gray-800">Client Portal</h1>
+        </div>
+        <div class="flex items-center gap-6">
+            <span class="text-gray-600 font-medium">Welcome, {{ client.contact_person }} ({{ client.company_name }})</span>
+            <a href="/portal/logout" class="text-gray-400 hover:text-red-600 transition-colors">
+                <i class="fa-solid fa-right-from-bracket mr-2"></i>Logout
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        
+        <!-- Welcome Banner -->
+        <div class="bg-blue-600 rounded-xl shadow-lg p-8 text-white mb-8 flex justify-between items-center">
+            <div>
+                <h2 class="text-3xl font-bold mb-2">Ready to start a new project?</h2>
+                <p class="text-blue-100">Launch an interview with our AI Consultant to gather requirements instantly.</p>
+            </div>
+            <button onclick="document.getElementById('newProjectModal').classList.remove('hidden')" class="bg-white text-blue-600 px-6 py-3 rounded-lg font-bold shadow-md hover:bg-gray-50 transition-colors flex items-center">
+                <i class="fa-solid fa-microphone mr-2"></i> Start Consultation
+            </button>
+        </div>
+
+        <!-- Project History -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-bold text-gray-800">Your Project Qualifications</h3>
+            </div>
+            
+            <div class="p-0">
+                {% if qualifications|length == 0 %}
+                <div class="p-12 text-center text-gray-500">
+                    <i class="fa-regular fa-folder-open text-5xl mb-4 text-gray-300"></i>
+                    <h4 class="text-lg font-medium text-gray-800 mb-1">No Projects Found</h4>
+                    <p>You haven't completed any AI consultations yet. Click the button above to get started.</p>
+                </div>
+                {% else %}
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
+                            <th class="p-4 pl-6 border-b font-semibold">Project Name</th>
+                            <th class="p-4 border-b font-semibold">Complexity Score</th>
+                            <th class="p-4 border-b font-semibold">Current Status</th>
+                            <th class="p-4 border-b font-semibold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for q in qualifications %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="p-4 pl-6 border-b font-medium text-gray-800">{{ q.project_name }}</td>
+                            <td class="p-4 border-b text-gray-600">
+                                {% if q.complexity_score %}
+                                    {{ q.complexity_score }} / 100
+                                {% else %}
+                                    <span class="text-gray-400 italic">Pending Calculation</span>
+                                {% endif %}
+                            </td>
+                            <td class="p-4 border-b">
+                                {% if q.final_decision %}
+                                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-bold">{{ q.final_decision }}</span>
+                                {% else %}
+                                    <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-bold">In Pipeline</span>
+                                {% endif %}
+                            </td>
+                            <td class="p-4 border-b">
+                                <a href="/portal/chat?project_name={{ q.project_name | urlencode }}" class="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1">
+                                    <i class="fa-solid fa-play"></i> Continue
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+
+    </main>
+
+    <!-- New Project Modal -->
+    <div id="newProjectModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-md w-full shadow-2xl">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Name Your Project</h3>
+            <p class="text-gray-600 text-sm mb-6">Please provide a unique name for this project consultation so you can easily track it later.</p>
+            <form onsubmit="event.preventDefault(); startNewProject();">
+                <input type="text" id="newProjectName" required class="w-full border border-gray-300 rounded-md px-4 py-2 mb-6 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="e.g. NexaCart E-commerce">
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="document.getElementById('newProjectModal').classList.add('hidden')" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors shadow-sm">Start Consultation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    function startNewProject() {
+        const name = document.getElementById('newProjectName').value;
+        if(name) {
+            window.location.href = `/portal/chat?project_name=${encodeURIComponent(name)}`;
+        }
+    }
+    </script>
+</body>
+</html>

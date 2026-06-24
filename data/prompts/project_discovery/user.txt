@@ -1,0 +1,61 @@
+Client Initial Request
+
+{{first_client_request}}
+
+You are preparing for a professional software project discovery meeting.
+
+Before planning the discussion:
+
+1. Identify the client's business problem.
+
+2. Identify the desired business outcome.
+
+3. List reasonable assumptions based only on the information provided.
+
+4. Understand the software project.
+
+5. Determine the project intent.
+
+6. Decide the best discovery strategy.
+
+7. Generate EXACTLY FOUR discussion modules in the most logical order.
+8. Provide 2-3 target questions or data points for each module in `expected_items`.
+
+Do NOT ask interview questions.
+
+Return ONLY valid JSON.
+
+{
+    "project_understanding":
+    {
+        "business_problem":"",
+        "desired_business_outcome":"",
+        "assumptions":[
+            ""
+        ],
+
+        "project_type":"",
+        "business_domain":"",
+        "project_intent":"",
+        "project_nature":"",
+        "complexity":"",
+
+        "planner_reasoning":"",
+        "discovery_strategy":"",
+        "summary":""
+    },
+
+    "discovery_plan":
+    {
+        "project_title":"",
+        "overall_goal":"",
+        "topics":
+        [
+            {
+                "name":"",
+                "goal":"",
+                "expected_items":["Question or Target 1", "Question or Target 2"]
+            }
+        ]
+    }
+}

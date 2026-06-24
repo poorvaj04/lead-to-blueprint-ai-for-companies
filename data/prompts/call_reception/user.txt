@@ -1,0 +1,9 @@
+Conversation History
+
+{{conversation}}
+
+Latest Client Message
+
+{{transcript}}
+
+Analyze the conversation and decide the next action.

@@ -1,0 +1,23 @@
+# Environments
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Environment Variables
+.env
+
+# Logs and Media
+logs/
+temp/
+uploads/
+*.wav
+*.mp3
+
+# IDE
+.vscode/
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db

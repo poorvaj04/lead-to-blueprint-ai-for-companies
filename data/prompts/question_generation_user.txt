@@ -1,0 +1,63 @@
+Project Type
+
+{{project_type}}
+
+--------------------------------------------------
+
+Business Domain
+
+{{business_domain}}
+
+--------------------------------------------------
+
+Business Problem
+
+{{business_problem}}
+
+--------------------------------------------------
+
+Current Discovery Topic
+
+{{current_topic}}
+
+--------------------------------------------------
+
+Interview Objective
+
+{{objective}}
+
+--------------------------------------------------
+
+Focus Area
+
+{{focus_area}}
+
+--------------------------------------------------
+
+Reasoning
+
+{{reasoning}}
+
+--------------------------------------------------
+
+Question Style
+
+{{question_style}}
+
+--------------------------------------------------
+
+Conversation History
+
+{{conversation_history}}
+
+--------------------------------------------------
+
+Generate the single best next interview question.
+
+The next question must naturally continue the conversation.
+
+Do not restart the interview.
+
+Do not repeat previous questions.
+
+Investigate deeper based on the client's latest response.

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Project Analyst</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar for Roadmap -->
+        <aside class="sidebar">
+            <h2>Project Roadmap</h2>
+            <ul class="module-list" id="moduleList">
+                <li style="color: #888; font-size: 0.9rem; font-style: italic;">Modules will be generated after your initial request.</li>
+            </ul>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="main-content">
+            <div class="chat-container" id="chatContainer">
+            <div class="chat-container" id="chatContainer">
+                <!-- Messages will be dynamically loaded here -->
+            </div>
+            </div>
+
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <input type="text" id="textInput" placeholder="Type your message here... or hold F8 to speak" autocomplete="off">
+                    <button id="sendBtn">Send</button>
+                </div>
+                <div class="recording-indicator" id="recordingIndicator">
+                    <div class="pulse"></div> Recording Voice (Release F8 to send)...
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const textInput = document.getElementById('textInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const recordingIndicator = document.getElementById('recordingIndicator');
+        const moduleList = document.getElementById('moduleList');
+        
+        // Audio handling
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        // Get project name from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectName = urlParams.get('project_name') || 'Default Project';
+
+        // Initialize SpeechSynthesis
+        const synth = window.speechSynthesis;
+
+        function speakText(text) {
+            if (synth.speaking) {
+                synth.cancel();
+            }
+            const utterance = new SpeechSynthesisUtterance(text);
+            // Optionally select a specific voice if desired
+            synth.speak(utterance);
+        }
+
+        // On load, ask backend for the first message
+        window.onload = async () => {
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: "__INIT__",
+                        project_name: projectName 
+                    })
+                });
+                const data = await response.json();
+                addMessage('AI', data.response);
+                if (data.modules) {
+                    updateRoadmap(data.modules);
+                }
+            } catch (err) {
+                console.error(err);
+                addMessage('AI', 'Error connecting to server.');
+            }
+        };
+
+        function addMessage(sender, text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender.toLowerCase()}`;
+            
+            const label = document.createElement('div');
+            label.className = 'message-label';
+            label.innerText = sender === 'AI' ? 'AI Analyst' : 'Client';
+            
+            const content = document.createElement('div');
+            content.className = 'message-content';
+            content.innerText = text;
+            
+            msgDiv.appendChild(label);
+            msgDiv.appendChild(content);
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            if (sender === 'AI') {
+                speakText(text);
+            }
+        }
+
+        function updateRoadmap(modules) {
+            if (!modules || modules.length === 0) return;
+            moduleList.innerHTML = '';
+            modules.forEach(mod => {
+                const li = document.createElement('li');
+                li.className = 'module-item';
+                if (mod.status === 'completed') li.classList.add('completed');
+                if (mod.status === 'active') li.classList.add('active');
+                
+                let icon = mod.status === 'completed' ? '✓' : '○';
+                let progressColor = mod.status === 'completed' ? '#2e7d32' : 'var(--accent-color)';
+                
+                li.innerHTML = `
+                    <span>${icon}</span>
+                    <div style="flex:1; margin-left:10px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                            <span style="font-size:0.95rem; font-weight:500; margin:0;">${mod.name}</span>
+                            <span style="font-size:0.8rem; font-weight:600; color: ${mod.status === 'completed' ? '#2e7d32' : '#888'};">${mod.percentage}%</span>
+                        </div>
+                        <div style="height:6px; background: ${mod.status === 'completed' ? '#c8e6c9' : '#e0e0e0'}; border-radius:3px; width:100%; overflow:hidden;">
+                            <div style="height:100%; background:${progressColor}; width:${mod.percentage}%; transition:width 0.4s ease;"></div>
+                        </div>
+                    </div>`;
+                moduleList.appendChild(li);
+            });
+        }
+
+        async function sendMessage(text) {
+            if (!text.trim()) return;
+            // Prevent user from sending __INIT__ directly
+            if (text.trim() === "__INIT__") return;
+            
+            addMessage('Client', text);
+            textInput.value = '';
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: text,
+                        project_name: projectName 
+                    })
+                });
+                const data = await response.json();
+                addMessage('AI', data.response);
+                if (data.modules) {
+                    updateRoadmap(data.modules);
+                }
+            } catch (err) {
+                console.error(err);
+                addMessage('AI', 'Error connecting to server.');
+            }
+        }
+
+        sendBtn.addEventListener('click', () => sendMessage(textInput.value));
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage(textInput.value);
+        });
+
+        // F8 Push-to-Talk Logic
+        document.addEventListener('keydown', async (e) => {
+            if (e.key === 'F8' && !isRecording && !e.repeat) {
+                e.preventDefault();
+                startRecording();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'F8' && isRecording) {
+                e.preventDefault();
+                stopRecording();
+            }
+        });
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.addEventListener("dataavailable", event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener("stop", async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    sendVoice(audioBlob);
+                    
+                    // Stop all tracks to release microphone
+                    stream.getTracks().forEach(track => track.stop());
+                });
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordingIndicator.classList.add('active');
+                
+                // If AI is talking, stop it so we don't record the AI
+                if (synth.speaking) synth.cancel();
+
+            } catch (err) {
+                console.error("Microphone access denied or error:", err);
+                alert("Could not access microphone.");
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            recordingIndicator.classList.remove('active');
+        }
+
+        async function sendVoice(blob) {
+            const formData = new FormData();
+            formData.append('file', blob, 'voice.wav');
+            
+            // Add project_name to the query parameters
+            const voiceUrl = new URL('/api/voice', window.location.origin);
+            voiceUrl.searchParams.append('project_name', projectName);
+
+            addMessage('Client', '🎙️ (Audio sent)');
+
+            try {
+                const response = await fetch(voiceUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                // Update client message with transcript
+                const clientMsgs = chatContainer.querySelectorAll('.client .message-content');
+                if (clientMsgs.length > 0 && data.client_transcript) {
+                    clientMsgs[clientMsgs.length - 1].innerText = `🎙️ ${data.client_transcript}`;
+                }
+
+                addMessage('AI', data.response);
+                if (data.modules) {
+                    updateRoadmap(data.modules);
+                }
+            } catch (err) {
+                console.error(err);
+                addMessage('AI', 'Error connecting to server for voice.');
+            }
+        }
+    </script>
+</body>
+</html>
