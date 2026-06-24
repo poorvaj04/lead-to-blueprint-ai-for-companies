@@ -13,4 +13,5 @@ email-validator
 
 python-json-logger
 python-multipart
-groqjinja2
+groq
+jinja2
