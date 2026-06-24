@@ -9,9 +9,6 @@ from src.dtos.speech_result import SpeechResult
 from src.services.text_normalization_service import (
     TextNormalizationService,
 )
-from src.services.voice_recorder_service import (
-    VoiceRecorderService,
-)
 from src.utils.logger import get_logger
 
 class SpeechToTextService:
@@ -27,9 +24,6 @@ class SpeechToTextService:
         self.api_keys = settings.GROQ_API_KEYS
         if not self.api_keys:
             self.logger.warning("No Groq API keys found in settings!")
-
-        # Voice Recorder (Kept for backwards compatibility)
-        self.recorder = VoiceRecorderService()
 
         # Text Normalizer
         self.normalizer = TextNormalizationService()
@@ -85,8 +79,9 @@ class SpeechToTextService:
     # --------------------------------------------------
 
     def listen(self) -> SpeechResult:
-
-        audio_path = self.recorder.listen()
+        from src.services.voice_recorder_service import VoiceRecorderService
+        recorder = VoiceRecorderService()
+        audio_path = recorder.listen()
 
         return self.transcribe(
             audio_path
