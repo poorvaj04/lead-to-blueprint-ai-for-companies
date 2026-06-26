@@ -11,3 +11,4 @@ from .technology import Technology
 from .infrastructure import Infrastructure
 from .completed_project import CompletedProject
 from .project_qualification import ProjectQualification
+from .manager_notification import ManagerNotification
